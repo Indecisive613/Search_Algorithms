@@ -79,6 +79,12 @@ class SearchAgent:
                 print(symbolToPrint, end=' ')
             print()
 
+    def heuristic(self, pos):
+        # The heuristic for A* search: Uses the manhatten distance to gauge the distance to the goal
+        row, col = pos
+        goalRow, goalCol = self.find_end()
+        return abs(goalRow - row) + abs(goalCol - col)
+
     def bfs(self): 
         startRow, startCol = self.find_start()
         goalRow, goalCol = self.find_end()
@@ -119,19 +125,20 @@ class SearchAgent:
         while len(fringe) > 0:
             # Explore the last node in the fringe (DFS uses a LIFO)
             row, col, path, cost = fringe.pop()
+            # Skip nodes that have already been visited
+            if((row,col) in visited):
+                continue
             visited.append((row, col))
             exploration_steps += 1
             # Check if the current node is the goal
             if row == goalRow and col == goalCol:
                 self.print_forest(path)
                 return len(path)-1, exploration_steps, cost
-            # Attempt to add all neighbors to the fringe
+            # Add all neighbors to the fringe
             for r,c in self.get_valid_neighbors((row,col)):
-                if (r,c) not in visited:
-                    # Add the unvisited neighbor to the fringe
-                    tempPath = path.copy()
-                    tempPath.append((r,c))
-                    fringe.append((r, c, tempPath, cost + self.get_cost((r,c)))) # Reminder that fringe has items of (<row>, <column>, <path>, <cost>)
+                tempPath = path.copy()
+                tempPath.append((r,c))
+                fringe.append((r, c, tempPath, cost + self.get_cost((r,c)))) # Reminder that fringe has items of (<row>, <column>, <path>, <cost>)
         return None
  
     def ucs(self): 
@@ -163,11 +170,34 @@ class SearchAgent:
 
 
     def astar(self, heuristic=None): 
-        # Implement A* logic: return exploration steps, path cost, and path length, or None if no path is found. 
-        return [-1,-1,-1]
-        if heuristic is None: 
-            def heuristic(pos): 
-                return abs(pos[0] - self.goal[0]) + abs(pos[1] - self.goal[1]) 
+        # Implements A* logic: return exploration steps, path cost, and path length, or None if no path is found.
+        start_Row, start_Col = self.find_start()
+        goal_Row, goal_Col = self.find_end()
+        # Format: <cost+heuristic> <cost> <row> <col> <path>
+        fringe = [(0, 0, start_Row, start_Col, [(start_Row, start_Col)])]
+        visited = []
+        exploration_steps = 0
+        oops_count = 0
+        while len(fringe) > 0:
+            # Explore the node with the minimum cost_and_heuristic (A* uses a min-heap)
+            cost_and_heuristic, cost, row, col, path = heapq.heappop(fringe)
+            # Skip nodes that have already been visited
+            if((row, col) in visited):
+                continue
+            visited.append((row,col))
+            exploration_steps += 1
+            # Check if the current node is the goal
+            if row == goal_Row and col == goal_Col:
+                self.print_forest(path)
+                return len(path) - 1, exploration_steps, cost
+            # Add valid neighbors
+            for r, c in self.get_valid_neighbors((row, col)):
+                new_cost_only = cost + self.get_cost((r, c))
+                new_cost_and_heuristic = new_cost_only + self.heuristic((r, c))
+                temp_Path = path.copy()  # Create a new path for neighbor
+                temp_Path.append((r, c))
+                heapq.heappush(fringe, (new_cost_and_heuristic, new_cost_only, r, c, temp_Path))
+        return None
 
 def test_search_agent(agent): 
     results = {} 
