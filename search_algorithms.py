@@ -1,5 +1,7 @@
 from collections import deque 
-import heapq 
+import heapq
+import pygame
+import time 
 
 def print_forest(forest): 
     for row in forest: 
@@ -51,43 +53,9 @@ class SearchAgent:
             valid_neighbors.append((row,col+1))
         return valid_neighbors
 
-    def find_start(self):
-        # Return the position of the start marker
-        # Start searching from the top left corner
-        for row in range(self.rows):
-            for col in range(self.cols):
-                if self.grid[row][col] == 'S':
-                    return (row,col)
-        return None
-
-    def find_end(self):
-        # Return the position of the goal
-        # Start searching from the bottom right corner
-        for row in range(self.rows-1, -1, -1):
-            for col in range(self.cols-1, -1, -1):
-                if self.grid[row][col] == '*':
-                    return (row,col)
-        return None
-
-    def print_forest(self, path):
-        # Prints the contents of the grid, showing the path taken with Ps
-        for row in range(self.rows):
-            for col in range(self.cols):
-                symbolToPrint = self.grid[row][col]
-                if (row,col) in path:
-                    symbolToPrint = 'P'
-                print(symbolToPrint, end=' ')
-            print()
-
-    def heuristic(self, pos):
-        # The heuristic for A* search: Uses the manhatten distance to gauge the distance to the goal
-        row, col = pos
-        goalRow, goalCol = self.find_end()
-        return abs(goalRow - row) + abs(goalCol - col)
-
     def bfs(self): 
-        startRow, startCol = self.find_start()
-        goalRow, goalCol = self.find_end()
+        startRow, startCol = self.start
+        goalRow, goalCol = self.goal
         # Start with the starting node in the fringe
         # Format is (<row>, <column>, <full path to this position>, <cost of the full path>)
         fringe = [(startRow, startCol, [(startRow,startCol)], 0)]
@@ -102,7 +70,8 @@ class SearchAgent:
         
         # Check if the current node is the goal
             if row == goalRow and col == goalCol:
-                self.print_forest(path)
+                self.print_path(path)
+                print("Path: " + str(path))
                 return len(path)-1, exploration_steps, cost
         
         # Add valid neighbors to the queue
@@ -115,8 +84,8 @@ class SearchAgent:
 
     def dfs(self): 
         # Implements DFS logic to find the goal: returns exploration steps, path cost, and path length, or None if no path is found.
-        startRow, startCol = self.find_start()
-        goalRow, goalCol = self.find_end()
+        startRow, startCol = self.start
+        goalRow, goalCol = self.goal
         # Start with the starting node in the fringe
         # Format is (<row>, <column>, <full path to this position>, <cost of the full path>)
         fringe = [(startRow, startCol, [(startRow,startCol)], 0)]
@@ -132,7 +101,7 @@ class SearchAgent:
             exploration_steps += 1
             # Check if the current node is the goal
             if row == goalRow and col == goalCol:
-                self.print_forest(path)
+                self.print_path(path)
                 return len(path)-1, exploration_steps, cost
             # Add all neighbors to the fringe
             for r,c in self.get_valid_neighbors((row,col)):
@@ -143,8 +112,8 @@ class SearchAgent:
  
     def ucs(self): 
         # Implement UCS logic: return exploration steps, path cost, and path length, or None if no path is found. 
-        start_Row, start_Col = self.find_start()
-        goal_Row, goal_Col = self.find_end()
+        start_Row, start_Col = self.start
+        goal_Row, goal_Col = self.goal
         fringe = [(0, start_Row, start_Col, [(start_Row, start_Col)])]
         visited = {}
         exploration_steps = 0
@@ -158,7 +127,8 @@ class SearchAgent:
             exploration_steps += 1
             # Check if the current node is the goal
             if row == goal_Row and col == goal_Col:
-                self.print_forest(path)
+                self.print_path(path)
+                print("Path: " + str(path))
                 return len(path) - 1, exploration_steps, cost
             # Add valid neighbors
             for r, c in self.get_valid_neighbors((row, col)):
@@ -171,13 +141,16 @@ class SearchAgent:
 
     def astar(self, heuristic=None): 
         # Implements A* logic: return exploration steps, path cost, and path length, or None if no path is found.
-        start_Row, start_Col = self.find_start()
-        goal_Row, goal_Col = self.find_end()
+        # Uses manhatten distance as the heuristic if no heuristic is specified
+        if heuristic is None:
+            def heuristic(pos):
+                return abs(pos[0] - self.goal[0]) + abs(pos[1] - self.goal[1])
+        start_Row, start_Col = self.start
+        goal_Row, goal_Col = self.goal
         # Format: <cost+heuristic> <cost> <row> <col> <path>
         fringe = [(0, 0, start_Row, start_Col, [(start_Row, start_Col)])]
         visited = []
         exploration_steps = 0
-        oops_count = 0
         while len(fringe) > 0:
             # Explore the node with the minimum cost_and_heuristic (A* uses a min-heap)
             cost_and_heuristic, cost, row, col, path = heapq.heappop(fringe)
@@ -188,12 +161,13 @@ class SearchAgent:
             exploration_steps += 1
             # Check if the current node is the goal
             if row == goal_Row and col == goal_Col:
-                self.print_forest(path)
+                self.print_path(path)
+                print("Path: " + str(path))
                 return len(path) - 1, exploration_steps, cost
             # Add valid neighbors
             for r, c in self.get_valid_neighbors((row, col)):
                 new_cost_only = cost + self.get_cost((r, c))
-                new_cost_and_heuristic = new_cost_only + self.heuristic((r, c))
+                new_cost_and_heuristic = new_cost_only + heuristic((r, c))
                 temp_Path = path.copy()  # Create a new path for neighbor
                 temp_Path.append((r, c))
                 heapq.heappush(fringe, (new_cost_and_heuristic, new_cost_only, r, c, temp_Path))
@@ -226,7 +200,68 @@ abs(pos[1] - agent.goal[1]))
     print(f"Path Length: {path_length} steps") 
     print(f"Exploration Steps: {exploration_steps}") 
     print(f"Cost Length: {cost_length}") 
-    return results 
+    return results
+
+def visual_representation(forest, rows, columns, path):
+    # Define colours and cell size
+    WHITE = (255, 255, 255)  # Locations with no cost
+    BLACK = (0, 0, 0)        # Obstacles
+    YELLOW = (255, 255, 0)   # Small Fires
+    RED = (255, 0, 0)        # Large Fires
+    BLUE = (0, 0, 255)       # Marks Pathfinder's Path
+    GREEN = (0, 255, 0)      # Marks the goal
+    cell_size = 50           # Each cell is 50x50 pixels
+    visited = []             # Cells that have already been visisted
+
+    # Set up the display
+    pygame.init()
+    screen = pygame.display.set_mode((rows * cell_size, columns * cell_size))
+    pygame.display.set_caption("Burning Forest")
+    
+    def draw_grid():
+        # Draws the grid and fill it with elements
+        for i in range(rows):
+            for j in range(columns):
+                # Calculate the pixel coordinates of the current cell
+                x1, y1 = j * cell_size, i * cell_size
+
+                # Determine the color of the cell
+                if (x1,y1) in visited:
+                    color = BLUE
+                elif forest[i][j] == '.':
+                    color = WHITE
+                elif forest[i][j] == '#':
+                    color = BLACK
+                elif forest[i][j] == 'f':
+                    color = YELLOW
+                elif forest[i][j] == 'F':
+                    color = RED
+                elif forest[i][j] == '*':
+                    color = GREEN
+                else:
+                    print("ERROR - Undefined object!")
+                    color = RED
+
+                # Draw the cell rectangle
+                pygame.draw.rect(screen, color, (x1, y1, cell_size, cell_size), 0)
+                # Draw the cell outline for visibility
+                pygame.draw.rect(screen, BLACK, (x1, y1, cell_size, cell_size), 1)
+
+    def animate_path():
+        # Function to animate the path through the grid
+        for step in path:
+            # Add current position to the visited nodes
+            i, j = step
+            x1, y1 = j * cell_size, i * cell_size  # Convert grid coordinates to pixel coordinates
+            visited.append((x1, y1))
+
+            # Update the display
+            draw_grid()
+            pygame.display.flip()
+            time.sleep(0.5)
+
+    animate_path()
+    pygame.quit()
 
 Agents = {} 
 forest0 = [['S', '.', '.', '.', '#', '#', '#', '.', '.', '.', '.', '.', '.', '.', '.'], 
@@ -308,3 +343,6 @@ Agents[3] = SearchAgent(start3, goal3, forest3)
 for AGENT in Agents: 
     print(f"Forest {AGENT} Solution:") 
     print(test_search_agent(Agents[AGENT])) 
+
+# Call visual_representation(forest, rows, columns, path) to see the visual representation
+# visual_representation(forest3, 15, 15, [(0, 0), (0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (3, 3), (4, 3), (4, 2), (4, 1), (5, 1), (6, 1), (6, 2), (6, 3), (7, 3), (8, 3), (9, 3), (10, 3), (11, 3), (11, 4), (11, 5), (11, 6), (12, 6), (13, 6), (13, 7), (13, 8), (13, 9), (13, 10), (14, 10), (14, 11), (14, 12), (14, 13), (14, 14)])
