@@ -112,7 +112,31 @@ class SearchAgent:
  
     def ucs(self): 
         # Implement UCS logic: return exploration steps, path cost, and path length, or None if no path is found. 
-        return [-1,-1,-1]
+        start_Row, start_Col = self.find_start()
+        goal_Row, goal_Col = self.find_end()
+        fringe = [(0, start_Row, start_Col, [(start_Row, start_Col)])]
+        visited = {}
+        exploration_steps = 0
+        while len(fringe) > 0:
+            # Explore the node with the minimum cost (UCS uses a min-heap)
+            cost, row, col, path = heapq.heappop(fringe)
+            if (row, col) in visited and visited[(row, col)] <= cost:
+                continue
+            # Otherwise, mark the node as visited with its cost
+            visited[(row, col)] = cost
+            exploration_steps += 1
+            # Check if the current node is the goal
+            if row == goal_Row and col == goal_Col:
+                self.print_forest(path)
+                return len(path) - 1, exploration_steps, cost
+            # Add valid neighbors
+            for r, c in self.get_valid_neighbors((row, col)):
+                new_cost = cost + self.get_cost((r, c))
+                temp_Path = path.copy()  # Create a new path forneighbor
+                temp_Path.append((r, c))
+                heapq.heappush(fringe, (new_cost, r, c, temp_Path))
+        return None
+
 
     def astar(self, heuristic=None): 
         # Implement A* logic: return exploration steps, path cost, and path length, or None if no path is found. 
