@@ -80,8 +80,32 @@ class SearchAgent:
             print()
 
     def bfs(self): 
-        # TODO Implement BFS logic: return exploration steps, path cost, and path length, or None if no path is found. 
-        return [-1,-1,-1]
+        startRow, startCol = self.find_start()
+        goalRow, goalCol = self.find_end()
+        # Start with the starting node in the fringe
+        # Format is (<row>, <column>, <full path to this position>, <cost of the full path>)
+        fringe = [(startRow, startCol, [(startRow,startCol)], 0)]
+        visited = []
+        exploration_steps = 0
+        
+        while len(fringe) > 0:
+            # BFS uses a FIFO
+            row, col, path, cost = fringe.pop(0)
+            visited.append((row, col))
+            exploration_steps += 1
+        
+        # Check if the current node is the goal
+            if row == goalRow and col == goalCol:
+                self.print_forest(path)
+                return len(path)-1, exploration_steps, cost
+        
+        # Add valid neighbors to the queue
+            for r, c in self.get_valid_neighbors((row, col)):
+                if (r, c) not in visited:
+                    temp_Path = path.copy()
+                    temp_Path.append((r, c))
+                    fringe.append((r, c, temp_Path, cost + self.get_cost((r, c))))
+        return None
 
     def dfs(self): 
         # Implements DFS logic to find the goal: returns exploration steps, path cost, and path length, or None if no path is found.
